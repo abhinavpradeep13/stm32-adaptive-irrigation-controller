@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Irrigation Dashboard</title>
+<style>
+:root{
+  --bg:#0e1116; --panel:#171c24; --panel2:#1e2530; --line:#2a3342; --text:#e6eaf0; --muted:#8b97a8;
+  --accent:#38bdf8; --green:#34d399; --yellow:#fbbf24; --orange:#fb923c; --red:#f87171; --violet:#a78bfa;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){--bg:#f3f5f8;--panel:#fff;--panel2:#eef1f5;--line:#d7dde6;--text:#17202b;--muted:#5d6b7e;
+    --accent:#0284c7;--green:#059669;--yellow:#b7791f;--orange:#c2410c;--red:#dc2626;--violet:#7c3aed;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+h1{font-size:17px;margin:0 8px 0 0;font-weight:650}
+button,select,input[type=number]{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#04202e;font-weight:600}
+#status{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--green);box-shadow:0 0 0 4px #34d39933}
+main{padding:14px 16px;max-width:1500px;margin:0 auto}
+.tank{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin-bottom:14px}
+.tank .bar{flex:1;height:14px;border-radius:7px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
+.tank .fill{height:100%;width:0;background:var(--accent);transition:width .4s,background .4s}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:1000px){.grid{grid-template-columns:1fr}}
+.zone{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.zone h2{margin:0;font-size:16px;font-weight:650;display:flex;align-items:center;gap:10px}
+.badge{font-size:12px;padding:2px 10px;border-radius:999px;font-weight:600;background:var(--panel2);color:var(--muted)}
+.badge.IDLE{background:#33415566;color:var(--muted)}
+.badge.PUMPING{background:var(--green);color:#042417}
+.badge.SOAKING{background:var(--yellow);color:#2b1c00}
+.badge.FAULT{background:var(--red);color:#2d0707}
+.top{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;margin:8px 0 4px}
+.big{font-size:54px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:22px;color:var(--muted);font-weight:500}
+.next{flex:1;min-width:210px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.next .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.next .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.next .s{font-size:12.5px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+@media (max-width:620px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel2);border-radius:10px;padding:7px 10px}
+.stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums}
+canvas{width:100%;height:230px;display:block;background:var(--panel2);border-radius:10px;margin-top:6px}
+canvas.small{height:130px}
+.cap{font-size:12px;color:var(--muted);margin:10px 0 0;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.legend span{margin-right:12px;white-space:nowrap}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.legend i.dash{background:none;border-top:2px dashed currentColor;height:0}
+.lower{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media (max-width:1000px){.lower{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+.card h3{margin:0 0 8px;font-size:14px;font-weight:650}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:12px}
+#events{max-height:220px;overflow:auto;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
+#events div{padding:2px 0;border-bottom:1px dashed var(--line)}
+#events .z1{color:var(--accent)} #events .z2{color:var(--violet)}
+.how{display:none;margin-top:14px}
+.how.on{display:block}
+.how ol{margin:6px 0 0 18px;padding:0}
+.how li{margin:5px 0}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px}
+.steps3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:1100px){.steps3{grid-template-columns:1fr}}
+.note{font-size:12.5px;color:var(--muted);margin:6px 0 0;min-height:54px}
+.note b{color:var(--text)}
+.eqline{margin:10px 0 0;padding:10px 12px;background:var(--panel2);border-radius:10px;font-size:13.5px;line-height:1.6}
+.eqline code{font-size:13px}
+.err{color:var(--red);font-size:13px;display:none;padding:8px 16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Irrigation Dashboard</h1>
+  <button id="btnConnect" class="primary">Connect board</button>
+  <button id="rain1" class="badge" title="send a rain event to zone 1 of the board (demo firmware)">Rain Z1</button>
+  <button id="rain2" class="badge" title="send a rain event to zone 2 of the board (demo firmware)">Rain Z2</button>
+  <label class="badge" style="cursor:pointer">Load log file<input id="file" type="file" accept=".csv,.txt,.log" hidden></label>
+  <select id="win" title="time window">
+    <option value="0">All data</option><option value="5">Last 5 min</option><option value="30">Last 30 min</option>
+    <option value="120">Last 2 h</option><option value="720">Last 12 h</option>
+  </select>
+  <button id="btnSave">Save CSV</button>
+  <button id="btnClear">Clear</button>
+  <div id="status"><span class="dot" id="dot"></span><span id="stxt">not connected</span></div>
+</header>
+<div class="err" id="err"></div>
+
+<main>
+  <div class="tank">
+    <b>Water tank</b>
+    <div class="bar"><div class="fill" id="tfill"></div></div>
+    <span id="ttxt" style="min-width:150px;text-align:right;font-variant-numeric:tabular-nums">no reading</span>
+  </div>
+
+  <div class="grid" id="zones"></div>
+
+  <div class="card" id="explain" style="margin-top:14px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:6px">
+      <h3 style="margin:0">How the prediction works, live</h3>
+      <select id="exz"><option value="0">Zone 1</option><option value="1">Zone 2</option></select>
+      <span style="color:var(--muted)">learned correction: <b id="know" style="color:var(--text)">–</b> <span id="knote"></span></span>
+    </div>
+    <div class="steps3">
+      <div><div class="cap"><b>① Samples the controller stores</b></div><canvas id="e1"></canvas><p class="note" id="t1"></p></div>
+      <div><div class="cap"><b>② Fit a straight line: its slope is the drying rate</b></div><canvas id="e2"></canvas><p class="note" id="t2"></p></div>
+      <div><div class="cap"><b>③ Extend the line to the watering threshold</b></div><canvas id="e3"></canvas><p class="note" id="t3"></p></div>
+    </div>
+    <p class="eqline" id="eqline"></p>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin:0 0 4px">Predicted vs real time left</h3>
+    <p class="cap" style="margin:0 0 8px">For one drying period: how many minutes the controller said were left (dots) against how many really were (dashed line). Grey = the first period, violet = the latest. As the controller learns, the violet dots move onto the dashed line.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+      <div><div class="cap"><b>Zone 1</b></div><canvas id="cd0" class="small"></canvas></div>
+      <div><div class="cap"><b>Zone 2</b></div><canvas id="cd1" class="small"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lower">
+    <div class="card"><h3>Prediction vs actual</h3>
+      <table id="acc"><thead><tr><th>Zone / cycle</th><th>Gain / offset</th><th>First predicted</th><th>Actual</th><th>Difference</th><th>First-prediction error</th><th>Whole-period error</th></tr></thead><tbody></tbody></table>
+      <canvas id="accChart" class="small" style="margin-top:10px"></canvas>
+      <div class="cap" style="margin-top:10px"><b>Learning curve: loss per cycle</b> (RMS error of the predictions made during that drying period, before the gradient-descent update). It should fall over the first cycles, then level off.</div>
+      <canvas id="kChart" class="small"></canvas>
+      <div class="cap" style="margin-top:10px"><b>Water plan error per cycle</b> (how far the planned mL per % was from what the cycle really needed; 0 = perfect)</div>
+      <canvas id="mlChart" class="small"></canvas>
+      <p class="cap" style="margin-top:8px">"Whole-period error" is the RMS error of every prediction made during that drying period, so it shows how good the controller is for most of the wait, not just its very first guess. "First predicted" is the time the controller first quoted after a watering cycle ended; "Actual" is how long it really took to reach the watering threshold. "Difference" is predicted minus actual: negative means the controller predicted too short a time, positive too long. Gain / offset are the two numbers the controller had learned (by gradient descent) when it made that prediction (×1.00 / 0 s = nothing yet). Drying periods interrupted by rain or manual watering are left out.</p>
+    </div>
+    <div class="card"><h3>Controller events</h3><div id="events"></div></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+// ================================================================ data store
+const NZ = 2;
+const COLS = ["ms","zone","raw","filt","pct","state","pump","tankPct","tankMl","pn","pr","model","tau","r2","mlh","mlpp","low","high","bursts","pns","ga","gb","gn","loss","mln","mlerr","dist"];   // pns (seconds) is optional
+let data = [[],[]];            // per zone: records, t in minutes
+let events = [];
+let acc = [[],[]];             // per zone: finished prediction-vs-actual rows
+let pend = [null,null];        // per zone: current drying period {t0, firstPred, firstAt}
+let tank = {pct:-1, ml:-1};
+let lastState = [null,null];
+let lastRx = 0;
+let learn = [[],[]];            // per zone: one point per learned drying period {n, loss %, gain, offset s}
+let mlLearn = [[],[]];          // per zone: plan error of mL per % per learned cycle {n, err %}
+let samples = [[],[]];          // per zone: the exact samples the controller's fit is using
+
+const BAND_DRY = 22, BAND_WET = 90;
+
+function addRecord(c){
+  // c = parsed fields after "CSV,"
+  if (c.length < COLS.length-1) return;
+  const r = {};
+  COLS.forEach((k,i)=>{ r[k] = (k==="state") ? c[i] : parseFloat(c[i]); });
+  if (isNaN(r.ga)) r.ga = 1;                                    // older firmware: nothing learned
+  if (isNaN(r.gb)) r.gb = 0;
+  if (isNaN(r.gn)) r.gn = 0;
+  if (isNaN(r.loss)) r.loss = NaN;
+  if (isNaN(r.mlerr)) r.mlerr = NaN;
+  if (isNaN(r.mln)) r.mln = 0;
+  if (isNaN(r.dist)) r.dist = 0;
+  if (isNaN(r.pns)) r.pns = r.pn < 0 ? -1 : r.pn*60;          // older firmware: whole minutes only
+  r.pn = r.pns >= 0 ? r.pns/60 : -1;                          // prediction in minutes, with seconds precision
+  if (!(r.zone>=1 && r.zone<=NZ) || isNaN(r.ms)) return;
+  r.t = r.ms/60000;
+  const z = r.zone-1;
+  const arr = data[z];
+  if (arr.length && r.t < arr[arr.length-1].t - 0.01){ arr.length = 0; acc[z].length = 0; pend[z]=null; samples[z]=[]; learn[z]=[]; mlLearn[z]=[]; }   // board was reset
+  arr.push(r);
+  if (r.tankPct >= 0) tank = {pct:r.tankPct, ml:r.tankMl}; else tank = {pct:-1, ml:-1};
+  { const L=learn[z], M=mlLearn[z];
+    if (r.gn > (L.length ? L[L.length-1].n : 0) && isFinite(r.loss)) L.push({n:r.gn, loss:r.loss, ga:r.ga, gb:r.gb});
+    if (r.mln > (M.length ? M[M.length-1].n : 0) && isFinite(r.mlerr)) M.push({n:r.mln, err:r.mlerr}); }
+  trackAccuracy(z, r);
+  lastRx = Date.now();
+}
+
+// prediction vs actual: a period starts when a cycle ends (state back to IDLE) and ends when watering starts
+function trackAccuracy(z, r){
+  const prev = lastState[z];
+  if (r.state === "IDLE" && prev && prev !== "IDLE"){ pend[z] = {t0:r.t, first:null, firstAt:null, series:[]}; }
+  const p = pend[z];
+  if (p && r.dist) p.bad = true;                                   // rain / manual watering: this period does not count
+  if (p && r.state === "IDLE" && r.pn >= 0 && p.first === null){ p.first = r.pn; p.firstAt = r.t; p.ga = r.ga; p.gb = r.gb; }
+  if (p && r.state === "IDLE" && r.pn >= 0 && p.firstAt !== null) p.series.push({t:r.t-p.firstAt, pn:r.pn});
+  if (p && prev === "IDLE" && r.state !== "IDLE"){
+    if (p.first !== null && !p.bad){
+      const actual = r.t - p.firstAt;
+      acc[z].push({n: acc[z].length+1, pred: p.first, actual, err: (p.first-actual)/actual*100, ga: p.ga, gb: p.gb, series: p.series});
+    }
+    pend[z] = null;
+  }
+  if (!p && prev === null && r.state === "IDLE") pend[z] = {t0:r.t, first:null, firstAt:null, series:[]};
+  lastState[z] = r.state;
+}
+
+function addEventLine(line){
+  if (!/WATERING PLAN|LEARNED|DISTURBED|RAIN|CYCLE DONE|FAULT|TANK EMPTY|TANK REFILLED|FORCE|Pump test|started/i.test(line)) return;
+  events.push({when:new Date(), text:line});
+  if (events.length > 300) events.shift();
+}
+
+function handleLine(line){
+  line = line.trim();
+  if (!line) return;
+  if (line.startsWith("CSV,")){ addRecord(line.slice(4).split(",")); return; }
+  if (line.startsWith("CSV_HEADER")) return;
+  if (line.startsWith("SAMP_CLEAR,")){ const z=parseInt(line.split(",")[1])-1; if (z>=0&&z<NZ) samples[z]=[]; return; }
+  if (line.startsWith("SAMP,")){
+    const p=line.split(","), z=parseInt(p[1])-1, ms=parseFloat(p[2]), v=parseFloat(p[3])/10;
+    if (z>=0 && z<NZ && !isNaN(ms) && !isNaN(v)){ samples[z].push({t:ms/60000, v}); if (samples[z].length>24) samples[z].shift(); }
+    return;
+  }
+  addEventLine(line);
+}
+
+// ================================================================ serial (Web Serial API)
+let port=null, reader=null;
+async function connect(){
+  if (!("serial" in navigator)){ showErr("This browser has no Web Serial support. Open the file in Chrome or Edge."); return; }
+  try{
+    port = await navigator.serial.requestPort();
+    await port.open({baudRate:115200});
+    setStatus(true,"connected, waiting for data…");
+    readLoop();
+  }catch(e){ showErr("Could not open the port: "+e.message+" (close other serial terminals first)"); }
+}
+async function readLoop(){
+  const dec = new TextDecoderStream();
+  const closed = port.readable.pipeTo(dec.writable).catch(()=>{});
+  reader = dec.readable.getReader();
+  let buf="";
+  try{
+    while(true){
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while((i = buf.indexOf("\n")) >= 0){ handleLine(buf.slice(0,i)); buf = buf.slice(i+1); }
+    }
+  }catch(e){ showErr("Serial read stopped: "+e.message); }
+  setStatus(false,"disconnected");
+}
+function setStatus(live, txt){ document.getElementById("dot").classList.toggle("live", live); document.getElementById("stxt").textContent = txt; }
+function showErr(m){ const e=document.getElementById("err"); e.textContent=m; e.style.display="block"; setTimeout(()=>e.style.display="none",9000); }
+
+// ================================================================ load / save
+document.getElementById("file").addEventListener("change", async ev=>{
+  const f = ev.target.files[0]; if (!f) return;
+  clearAll();
+  const text = await f.text();
+  for (const raw of text.split(/\r?\n/)){
+    let line = raw.trim();
+    if (!line || line.startsWith("pc_time")) continue;
+    if (line.startsWith("CSV,")) { handleLine(line); continue; }
+    // logger format: pc_time,ms,zone,...  (first column is a timestamp)
+    const parts = line.split(",");
+    if (parts.length >= COLS.length && /^\d{4}-/.test(parts[0])) addRecord(parts.slice(1));
+    else handleLine(line);
+  }
+  setStatus(false, "loaded "+f.name);
+});
+document.getElementById("btnSave").onclick = ()=>{
+  const rows=["ms,zone,raw_adc,filtered_adc,moisture_pct,state,pump_on,tank_pct,tank_ml,pred_next_min,pred_rate_pct_h,model,tau_min,r2,ml_per_h,ml_per_pct,low_pct,high_pct,bursts,pred_next_s"];
+  const all=[...data[0],...data[1]].sort((a,b)=>a.ms-b.ms);
+  for(const r of all) rows.push(COLS.map(k=>r[k]).join(","));
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([rows.join("\n")],{type:"text/csv"}));
+  a.download="irrigation_dashboard_export.csv"; a.click();
+};
+function clearAll(){ samples=[[],[]]; data=[[],[]]; events=[]; acc=[[],[]]; pend=[null,null]; lastState=[null,null]; tank={pct:-1,ml:-1}; }
+document.getElementById("btnClear").onclick = clearAll;
+document.getElementById("btnConnect").onclick = connect;
+async function sendRain(z){
+  if (!port || !port.writable){ showErr("Connect the board first."); return; }
+  const w = port.writable.getWriter();
+  try{ await w.write(new TextEncoder().encode(String(z))); }catch(e){ showErr("Could not send: "+e.message); }
+  finally{ w.releaseLock(); }
+}
+document.getElementById("rain1").onclick = ()=>sendRain(1);
+document.getElementById("rain2").onclick = ()=>sendRain(2);
+
+// ================================================================ drawing
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  if (cv.width!==Math.round(w*dpr) || cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); }
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  return {g,w,h};
+}
+// duration with seconds: "42 s", "7 min 12 s", "2 h 14 min 05 s"
+function fmtDur(min){
+  const t=Math.max(0,Math.round(min*60)), h=Math.floor(t/3600), m=Math.floor((t%3600)/60), sc=t%60;
+  if (h>0) return `${h} h ${String(m).padStart(2,"0")} min ${String(sc).padStart(2,"0")} s`;
+  if (m>0) return `${m} min ${String(sc).padStart(2,"0")} s`;
+  return `${sc} s`;
+}
+function fmtT(min){
+  const s=Math.round(min*60), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  return h>0 ? `${h}:${String(m).padStart(2,"0")}h` : (m>0 ? `${m}m${String(ss).padStart(2,"0")}s` : `${ss}s`);
+}
+function niceStep(range, n){ const raw=range/n, p=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/p; return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+
+function windowed(arr){
+  const w = +document.getElementById("win").value;
+  if (!arr.length) return arr;
+  if (!w) return arr;
+  const tmax = arr[arr.length-1].t;
+  return arr.filter(r=>r.t >= tmax - w);
+}
+
+function projection(r){
+  // the straight line from now to the predicted watering moment: [[dt_minutes, pct], ...] or null
+  if (!r || r.state!=="IDLE" || r.pn<0 || r.model<1) return null;
+  return [[0, r.pct], [Math.max(r.pn,0.2), r.low]];
+}
+
+function drawMoisture(cv, z){
+  const {g,w,h} = setupCanvas(cv);
+  const arr = windowed(data[z]);
+  const L=42,R=12,T=10,B=24;
+  const last = arr[arr.length-1];
+  const proj = projection(last);
+  const tmin = arr.length? arr[0].t : 0;
+  let tmax = arr.length? last.t : 1;
+  if (proj) tmax = last.t + proj[proj.length-1][0]*1.04;
+  if (tmax - tmin < 0.5) tmax = tmin + 0.5;
+  const X = t => L + (t-tmin)/(tmax-tmin)*(w-L-R);
+  const Y = v => T + (1 - v/100)*(h-T-B);
+
+  // grid
+  g.font="11px system-ui"; g.fillStyle=css("--muted"); g.strokeStyle=css("--line"); g.lineWidth=1;
+  for (let v=0; v<=100; v+=20){ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(w-R,Y(v)); g.stroke(); g.textAlign="right"; g.fillText(v+"%", L-6, Y(v)+4); }
+  const step=niceStep(tmax-tmin,6); g.textAlign="center";
+  for (let t=Math.ceil(tmin/step)*step; t<=tmax; t+=step){ g.fillText(fmtT(t), X(t), h-7); g.beginPath(); g.moveTo(X(t),T); g.lineTo(X(t),h-B); g.strokeStyle=css("--line"); g.globalAlpha=.4; g.stroke(); g.globalAlpha=1; }
+
+  if (!arr.length){ g.fillStyle=css("--muted"); g.textAlign="center"; g.fillText("waiting for data…", w/2, h/2); return; }
+
+  // state bands (consecutive samples with the same state are drawn as one block)
+  for (let i=0;i<arr.length;){
+    const s=arr[i].state; let j=i; while (j+1<arr.length && arr[j+1].state===s) j++;
+    if (s==="PUMPING" || s==="SOAKING" || s==="FAULT"){
+      const x0=X(arr[i].t), x1=X(j+1<arr.length?arr[j+1].t:arr[j].t+0.02);
+      g.fillStyle = s==="PUMPING"? css("--green") : s==="SOAKING"? css("--yellow") : css("--red");
+      g.globalAlpha = s==="SOAKING" ? .10 : .28; g.fillRect(x0,T,Math.max(1.5,x1-x0),h-T-B); g.globalAlpha=1;
+    }
+    i=j+1;
+  }
+  // thresholds
+  g.setLineDash([6,4]); g.lineWidth=1.3;
+  g.strokeStyle=css("--orange"); g.beginPath(); g.moveTo(L,Y(last.low)); g.lineTo(w-R,Y(last.low)); g.stroke();
+  g.strokeStyle=css("--green");  g.beginPath(); g.moveTo(L,Y(last.high)); g.lineTo(w-R,Y(last.high)); g.stroke();
+  g.setLineDash([]); g.fillStyle=css("--orange"); g.textAlign="left"; g.fillText("water below "+last.low+"%", L+6, Y(last.low)-5);
+  g.fillStyle=css("--green"); g.fillText("stop at "+last.high+"%", L+6, Y(last.high)-5);
+
+  // moisture line
+  g.strokeStyle=css("--accent"); g.lineWidth=2.2; g.beginPath();
+  arr.forEach((r,i)=>{ const x=X(r.t), y=Y(r.pct); i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke();
+
+  // predicted projection
+  if (proj){
+    g.setLineDash([7,5]); g.strokeStyle=css("--violet"); g.lineWidth=2.2; g.beginPath();
+    proj.forEach(([s,v],i)=>{ const x=X(last.t+s), y=Y(v); i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke(); g.setLineDash([]);
+    const ex=X(last.t+proj[proj.length-1][0]), ey=Y(proj[proj.length-1][1]);
+    g.fillStyle=css("--violet"); g.beginPath(); g.arc(ex,ey,5,0,6.3); g.fill();
+    g.textAlign = ex>w-130 ? "right":"left";
+    g.fillText("predicted: water in "+fmtDur(last.pn), ex+(ex>w-130?-9:9), ey-16);
+  }
+  const lx=X(last.t), ly=Y(last.pct);
+  g.fillStyle=css("--accent"); g.beginPath(); g.arc(lx,ly,4,0,6.3); g.fill();
+}
+
+function drawAdc(cv, z){
+  const {g,w,h} = setupCanvas(cv);
+  const arr = windowed(data[z]); const L=42,R=12,T=8,B=20;
+  if (!arr.length) return;
+  let lo=Infinity, hi=-Infinity; arr.forEach(r=>{ lo=Math.min(lo,r.raw,r.filt); hi=Math.max(hi,r.raw,r.filt); });
+  if (hi-lo<10){ lo-=5; hi+=5; }
+  const pad=(hi-lo)*.08; lo-=pad; hi+=pad;
+  const tmin=arr[0].t, tmax=Math.max(arr[arr.length-1].t, tmin+0.5);
+  const X=t=>L+(t-tmin)/(tmax-tmin)*(w-L-R), Y=v=>T+(1-(v-lo)/(hi-lo))*(h-T-B);
+  g.font="11px system-ui"; g.fillStyle=css("--muted"); g.strokeStyle=css("--line"); g.lineWidth=1; g.textAlign="right";
+  const st=niceStep(hi-lo,3);
+  for (let v=Math.ceil(lo/st)*st; v<=hi; v+=st){ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(w-R,Y(v)); g.stroke(); g.fillText(Math.round(v), L-6, Y(v)+4); }
+  g.textAlign="center"; const ts=niceStep(tmax-tmin,5);
+  for (let t=Math.ceil(tmin/ts)*ts;t<=tmax;t+=ts) g.fillText(fmtT(t),X(t),h-5);
+  g.strokeStyle=css("--muted"); g.globalAlpha=.55; g.lineWidth=1; g.beginPath();
+  arr.forEach((r,i)=>{ i?g.lineTo(X(r.t),Y(r.raw)):g.moveTo(X(r.t),Y(r.raw)); }); g.stroke(); g.globalAlpha=1;
+  g.strokeStyle=css("--accent"); g.lineWidth=2; g.beginPath();
+  arr.forEach((r,i)=>{ i?g.lineTo(X(r.t),Y(r.filt)):g.moveTo(X(r.t),Y(r.filt)); }); g.stroke();
+}
+
+// ================================================================ UI
+const zonesEl = document.getElementById("zones");
+for (let z=0; z<NZ; z++){
+  const d=document.createElement("section"); d.className="zone"; d.id="zone"+z;
+  d.innerHTML = `
+    <h2>Zone ${z+1} <span class="badge" id="st${z}">–</span></h2>
+    <div class="top">
+      <div class="big"><span id="pct${z}">--</span><small>%</small><div style="font-size:13px;color:var(--muted);font-weight:500" id="band${z}"></div></div>
+      <div class="next"><div class="k">Next watering</div><div class="v" id="next${z}">–</div><div class="s" id="nexts${z}"></div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Drying rate</div><div class="v" id="rate${z}">–</div></div>
+      <div class="stat"><div class="k">Water loss</div><div class="v" id="mlh${z}">–</div></div>
+      <div class="stat"><div class="k">Fit quality R²</div><div class="v" id="fit${z}">–</div></div>
+      <div class="stat"><div class="k">Soil: mL per % (learned)</div><div class="v" id="mlpp${z}">–</div></div>
+      <div class="stat"><div class="k">Gain / offset (learned)</div><div class="v" id="ks${z}">–</div></div>
+      <div class="stat"><div class="k">Cycles learned (rate / mL)</div><div class="v" id="kn${z}">–</div></div>
+    </div>
+    <div class="cap"><b>Moisture</b>
+      <span class="legend"><span><i style="background:var(--accent)"></i>measured</span><span style="color:var(--violet)"><i class="dash"></i>predicted</span>
+      <span style="color:var(--green)"><i style="background:currentColor;opacity:.4;height:8px"></i>pumping</span><span style="color:var(--yellow)"><i style="background:currentColor;opacity:.4;height:8px"></i>soaking</span></span></div>
+    <canvas id="cm${z}"></canvas>
+    <div class="cap"><b>Sensor ADC</b><span class="legend"><span><i style="background:var(--muted)"></i>raw</span><span><i style="background:var(--accent)"></i>filtered</span></span></div>
+    <canvas id="ca${z}" class="small"></canvas>`;
+  zonesEl.appendChild(d);
+}
+
+
+// ================================================================ prediction explained (same maths as the firmware)
+function linregJS(x,y){
+  const n=x.length; let mx=0,my=0; for(let i=0;i<n;i++){mx+=x[i];my+=y[i];} mx/=n; my/=n;
+  let sxx=0,sxy=0,syy=0; for(let i=0;i<n;i++){ sxx+=(x[i]-mx)**2; sxy+=(x[i]-mx)*(y[i]-my); syy+=(y[i]-my)**2; }
+  if (sxx<1e-9) return null;
+  const b=sxy/sxx; return {b, a:my-b*mx, r2: syy>1e-12 ? sxy*sxy/(sxx*syy) : 1};
+}
+const RATE_N = 24;           // samples in the controller's fit window
+function computeFit(z){
+  const S=samples[z], recs=data[z], last=recs[recs.length-1];
+  if (!last) return null;
+  const out={S, low:last.low, last, n:S.length};
+  if (S.length<2) return out;
+  out.x0=S[0].t; out.xs=S.map(s=>s.t-out.x0); out.xn=last.t-out.x0;
+  const lin=linregJS(out.xs, S.map(s=>s.v)); out.lin=lin;
+  if (lin && lin.b<0){
+    out.rate=-lin.b*60;                                           // %/hour
+    out.now=lin.a+lin.b*out.xn;                                   // the line's value now
+    out.rawMin = out.now<=last.low ? 0 : (out.now-last.low)/(-lin.b);
+    out.w=Math.max(0,1-S.length/RATE_N);                          // how strongly the learned correction applies
+    out.ga=isFinite(last.ga)?last.ga:1; out.gb=isFinite(last.gb)?last.gb:0;
+    out.effMin=Math.max(0, out.rawMin*(1+(out.ga-1)*out.w) + out.gb*out.w/60);   // gain on the rate, offset in seconds
+  }
+  return out;
+}
+
+// small plotting helper: opts = {xmin,xmax,ymin,ymax,xfmt,yfmt,series:[{pts,color,dash,width,dots}],hlines,labels:[{x,y,text,color,align}]}
+function plotXY(cv, o){
+  const {g,w,h}=setupCanvas(cv); const L=44,R=12,T=10,B=22;
+  const X=x=>L+(x-o.xmin)/(o.xmax-o.xmin)*(w-L-R), Y=y=>T+(1-(y-o.ymin)/(o.ymax-o.ymin))*(h-T-B);
+  g.font="11px system-ui"; g.lineWidth=1; g.strokeStyle=css("--line"); g.fillStyle=css("--muted");
+  const ys=niceStep(o.ymax-o.ymin,4); g.textAlign="right";
+  for (let v=Math.ceil(o.ymin/ys)*ys; v<=o.ymax; v+=ys){ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(w-R,Y(v)); g.stroke(); g.fillText(o.yfmt?o.yfmt(v):v.toFixed(0), L-6, Y(v)+4); }
+  const xs=niceStep(o.xmax-o.xmin,4); g.textAlign="center";
+  for (let v=Math.ceil(o.xmin/xs)*xs; v<=o.xmax; v+=xs) g.fillText(o.xfmt?o.xfmt(v):fmtT(v), X(v), h-6);
+  (o.hlines||[]).forEach(l=>{ g.setLineDash([6,4]); g.strokeStyle=l.color; g.lineWidth=1.3; g.beginPath(); g.moveTo(L,Y(l.y)); g.lineTo(w-R,Y(l.y)); g.stroke(); g.setLineDash([]);
+    g.fillStyle=l.color; g.textAlign="left"; g.fillText(l.label, L+6, Y(l.y)-5); });
+  (o.series||[]).forEach(s=>{
+    if (s.dots){ g.fillStyle=s.color; s.pts.forEach(([x,y])=>{ g.beginPath(); g.arc(X(x),Y(y),3.2,0,6.3); g.fill(); }); }
+    else { g.setLineDash(s.dash||[]); g.strokeStyle=s.color; g.lineWidth=s.width||2; g.beginPath(); s.pts.forEach(([x,y],i)=>{ i?g.lineTo(X(x),Y(y)):g.moveTo(X(x),Y(y)); }); g.stroke(); g.setLineDash([]); }
+  });
+  (o.labels||[]).forEach(l=>{ g.fillStyle=l.color; g.textAlign=l.align||"left"; g.fillText(l.text, X(l.x), Y(l.y)+(l.dy||0)); if (l.dot){ g.beginPath(); g.arc(X(l.x),Y(l.y),5,0,6.3); g.fill(); } });
+  return {X,Y,w,h,g};
+}
+function emptyPlot(cv,msg){ const {g,w,h}=setupCanvas(cv); g.fillStyle=css("--muted"); g.font="12px system-ui"; g.textAlign="center"; g.fillText(msg,w/2,h/2); }
+const sg=(v,d)=> (v<0?"−":"")+Math.abs(v).toFixed(d);
+
+function drawExplain(){
+  const z=+document.getElementById("exz").value, F=computeFit(z);
+  { const lr=data[z][data[z].length-1];
+    document.getElementById("know").textContent = lr ? `gain ×${lr.ga.toFixed(2)}, offset ${lr.gb>=0?"+":"−"}${Math.abs(lr.gb).toFixed(0)} s` : "–";
+    document.getElementById("knote").textContent = lr ? (lr.gn ? `(gradient descent, ${lr.gn} cycle${lr.gn===1?"":"s"})` : "(not learned yet: starts at gain ×1.00, offset 0)") : ""; }
+  const t1=document.getElementById("t1"), t2=document.getElementById("t2"), t3=document.getElementById("t3"), el=document.getElementById("eqline");
+  if (!F || F.n<2){
+    ["e1","e2","e3"].forEach(id=>emptyPlot(document.getElementById(id),"collecting samples…"));
+    t1.textContent="While the zone is idle the controller stores one moisture sample every few minutes. The list is cleared when watering starts and ends.";
+    t2.textContent=""; t3.textContent=""; el.textContent=""; return;
+  }
+  const S=F.S, xmaxS=F.xs[F.xs.length-1];
+  const vmin=Math.min(...S.map(s=>s.v),F.low), vmax=Math.max(...S.map(s=>s.v));
+  const pts1=S.map((s,i)=>[F.xs[i],s.v]);
+  plotXY(document.getElementById("e1"),{xmin:0,xmax:Math.max(xmaxS,0.2)*1.03,ymin:Math.max(0,vmin-4),ymax:Math.min(100,vmax+4),
+    yfmt:v=>v.toFixed(0)+"%", series:[{pts:pts1,color:css("--accent"),dots:true}]});
+  t1.innerHTML=`<b>${F.n} samples</b> (dots), oldest on the left. The controller keeps the last ${RATE_N}.`;
+  if (F.n<RATE_MIN){ t2.textContent=`Needs at least ${RATE_MIN} samples before it predicts (${F.n}/${RATE_MIN}).`; t3.textContent="";
+    emptyPlot(document.getElementById("e2"),"collecting samples…"); emptyPlot(document.getElementById("e3"),"collecting samples…"); el.textContent=""; return; }
+  if (F.rate===undefined){
+    emptyPlot(document.getElementById("e2"),"not drying"); emptyPlot(document.getElementById("e3"),"");
+    t2.textContent="The moisture is not falling, so there is no prediction."; t3.textContent=""; el.textContent=""; return; }
+  // ---- panel 2: the least-squares line through the samples
+  plotXY(document.getElementById("e2"),{xmin:0,xmax:Math.max(xmaxS,0.2)*1.03,ymin:Math.max(0,vmin-4),ymax:Math.min(100,vmax+4),
+    yfmt:v=>v.toFixed(0)+"%", series:[{pts:[[0,F.lin.a],[xmaxS,F.lin.a+F.lin.b*xmaxS]],color:css("--violet"),width:2.2},{pts:pts1,color:css("--accent"),dots:true}]});
+  t2.innerHTML=`The violet line is the least-squares fit. Its slope is the drying rate: <b>${F.rate.toFixed(2)} %/h</b>. R² = <b>${F.lin.r2.toFixed(3)}</b> (1 = perfect).`;
+  // ---- panel 3: extend to the threshold
+  const xEnd=F.xn+F.rawMin, xEff=F.xn+F.effMin, xmax3=Math.max(xEnd,xEff,xmaxS)*1.06;
+  const series=[{pts:[[0,F.lin.a],[xEnd,F.lin.a+F.lin.b*xEnd]],color:css("--violet"),width:2.2,dash:[6,4]},{pts:pts1,color:css("--accent"),dots:true}];
+  const labels=[{x:xEnd,y:F.low,text:"  line alone: "+fmtDur(F.rawMin),color:css("--muted"),align:xEnd>xmax3*0.6?"right":"left",dot:true,dy:-16}];
+  if (Math.abs(F.effMin-F.rawMin)>0.05) labels.push({x:xEff,y:F.low,text:"  with learned gain/offset: "+fmtDur(F.effMin),color:css("--violet"),align:xEff>xmax3*0.6?"right":"left",dot:true,dy:20});
+  plotXY(document.getElementById("e3"),{xmin:0,xmax:xmax3,ymin:Math.max(0,Math.min(F.low,vmin)-6),ymax:Math.min(100,vmax+4),yfmt:v=>v.toFixed(0)+"%",
+    series, hlines:[{y:F.low,color:css("--orange"),label:"water below "+F.low+"%"}], labels});
+  t3.innerHTML=`The line is extended until it meets the ${F.low}% threshold: <b>${fmtDur(F.rawMin)}</b> from now. The controller then applies what it has learned about this soil (below).`;
+  el.innerHTML=`<b>Result:</b> time = (moisture now − threshold) ÷ rate = (${F.now.toFixed(1)} − ${F.low}) ÷ ${F.rate.toFixed(2)} %/h = <b>${fmtDur(F.rawMin)}</b>. `
+    + `Learned gain <b>×${F.ga.toFixed(2)}</b> and offset <b>${F.gb>=0?"+":"−"}${Math.abs(F.gb).toFixed(0)} s</b>, applied with weight ${F.w.toFixed(2)} (it fades out as the window fills: ${F.n}/${RATE_N} samples) → <b>${fmtDur(F.effMin)}</b>. `
+    + `The controller reports <b>${F.last.pn>=0 ? fmtDur(F.last.pn) : "no prediction yet"}</b>.`;
+}
+const RATE_MIN = 4;
+function drawAccChart(){
+  const cv=document.getElementById("accChart"); const {g,w,h}=setupCanvas(cv); const L=40,R=12,T=10,B=22;
+  const maxn=Math.max(2,...acc.map(a=>a.length)); let m=10; acc.forEach(a=>a.forEach(r=>{ m=Math.max(m,Math.abs(r.err)); })); m=Math.ceil(m/10)*10;
+  const X=n=>L+(n-1)/(maxn-1)*(w-L-R), Y=v=>T+(1-(v+m)/(2*m))*(h-T-B);
+  g.font="11px system-ui"; g.fillStyle=css("--muted"); g.strokeStyle=css("--line"); g.lineWidth=1; g.textAlign="right";
+  [-m,0,m].forEach(v=>{ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(w-R,Y(v)); g.strokeStyle=v===0?css("--muted"):css("--line"); g.stroke(); g.fillText((v>0?"+":"")+v+"%",L-6,Y(v)+4); });
+  g.textAlign="center"; for(let n=1;n<=maxn;n++) g.fillText("#"+n, X(n), h-6);
+  if (!acc.some(a=>a.length)){ g.fillText("prediction error per cycle appears here", w/2, h/2); return; }
+  acc.forEach((a,z)=>{ g.strokeStyle=z?css("--violet"):css("--accent"); g.fillStyle=g.strokeStyle; g.lineWidth=2; g.beginPath();
+    a.forEach((r,i)=>{ i?g.lineTo(X(r.n),Y(r.err)):g.moveTo(X(r.n),Y(r.err)); }); g.stroke();
+    a.forEach(r=>{ g.beginPath(); g.arc(X(r.n),Y(r.err),3.5,0,6.3); g.fill(); }); });
+  g.textAlign="left"; g.fillStyle=css("--accent"); g.fillText("● zone 1",L+8,T+10); g.fillStyle=css("--violet"); g.fillText("● zone 2",L+70,T+10);
+}
+function drawCycleChart(id, series, emptyMsg, unit){
+  // series[z] = [{n, v}] ; one line per zone, x = learned cycle number, y >= 0
+  const cv=document.getElementById(id); const {g,w,h}=setupCanvas(cv); const L=44,R=12,T=14,B=22;
+  const maxn=Math.max(2,...series.map(a=>a.length?a[a.length-1].n:0));
+  let hi=5; series.forEach(a=>a.forEach(p=>{ hi=Math.max(hi,p.v); })); hi=Math.ceil(hi/10)*10;
+  const X=n=>L+(n-1)/(maxn-1)*(w-L-R), Y=v=>T+(1-v/hi)*(h-T-B);
+  g.font="11px system-ui"; g.fillStyle=css("--muted"); g.lineWidth=1; g.textAlign="right";
+  [0,hi/2,hi].forEach(v=>{ g.beginPath(); g.strokeStyle=v===0?css("--muted"):css("--line"); g.moveTo(L,Y(v)); g.lineTo(w-R,Y(v)); g.stroke(); g.fillText(v.toFixed(0)+unit,L-6,Y(v)+4); });
+  g.textAlign="center"; for(let n=1;n<=maxn;n++) g.fillText("#"+n, X(n), h-6);
+  if (!series.some(a=>a.length)){ g.fillText(emptyMsg, w/2, h/2); return; }
+  series.forEach((a,z)=>{ g.strokeStyle=z?css("--violet"):css("--accent"); g.fillStyle=g.strokeStyle; g.lineWidth=2; g.beginPath();
+    a.forEach((p,i)=>{ i?g.lineTo(X(p.n),Y(p.v)):g.moveTo(X(p.n),Y(p.v)); }); g.stroke();
+    a.forEach(p=>{ g.beginPath(); g.arc(X(p.n),Y(p.v),3.5,0,6.3); g.fill(); }); });
+  g.textAlign="left"; g.fillStyle=css("--accent"); g.fillText("● zone 1",L+8,T-2); g.fillStyle=css("--violet"); g.fillText("● zone 2",L+70,T-2);
+}
+function drawKChart(){ drawCycleChart("kChart", learn.map(a=>a.map(p=>({n:p.n,v:p.loss}))), "the learning curve appears after the first learned cycle", "%"); }
+function drawMlChart(){ drawCycleChart("mlChart", mlLearn.map(a=>a.map(p=>({n:p.n,v:Math.abs(p.err)}))), "appears after the first measured watering cycle", "%"); }
+function drawCountdown(id, z){
+  const cv=document.getElementById(id), A=acc[z];
+  if (!A.length){ emptyPlot(cv,"appears after the first completed drying period"); return; }
+  const first=A[0], last=A[A.length-1];
+  const T=last.actual, ymax=Math.max(T, ...last.series.map(p=>p.pn), ...first.series.map(p=>p.pn))*1.05;
+  const series=[{pts:[[0,last.actual],[last.actual,0]],color:css("--text"),dash:[6,4],width:1.6}];
+  if (A.length>1) series.push({pts:first.series.map(p=>[p.t,p.pn]),color:css("--muted"),dots:true});
+  series.push({pts:last.series.map(p=>[p.t,p.pn]),color:css("--violet"),dots:true});
+  plotXY(cv,{xmin:0,xmax:Math.max(T,first.actual)*1.02,ymin:0,ymax,xfmt:fmtT,yfmt:v=>fmtT(v),series});
+}
+document.getElementById("exz").addEventListener("change", drawExplain);
+
+function fmtNext(min){ return fmtDur(min); }
+
+function refresh(){
+  for (let z=0; z<NZ; z++){
+    const arr=data[z], r=arr[arr.length-1];
+    const $=id=>document.getElementById(id+z);
+    if (r){
+      $("pct").textContent = r.pct.toFixed(1);
+      $("band").textContent = r.pct<=BAND_DRY?"DRY":r.pct>=BAND_WET?"WET":"MOIST";
+      const st=$("st"); st.textContent=r.state; st.className="badge "+r.state;
+      let v="–", s="";
+      if (r.state==="PUMPING"||r.state==="SOAKING"){ v="watering now"; s=`burst ${r.bursts}${r.state==="SOAKING"?" · soaking":""}`; }
+      else if (r.state==="FAULT"){ v="FAULT"; s="check pump / tank, press reset"; }
+      else if (r.pn>=0){ v=(r.pn<1/60?"now":(r.pn>=72*60-1?"> ":"in ")+fmtNext(r.pn)); s=`when moisture falls to ${r.low}%`; }
+      else if (r.pct>=BAND_WET){ v="sensor saturated"; s="drying not measurable above "+BAND_WET+"%"; }
+      else { v="collecting data…"; s="needs a few drying samples"; }
+      $("next").textContent=v; $("nexts").textContent=s;
+      const ok = r.state==="IDLE" && r.pn>=0 && r.model>=1;
+      $("rate").textContent = ok ? r.pr.toFixed(2)+" %/h" : "–";
+      $("mlh").textContent  = ok ? r.mlh.toFixed(1)+" mL/h" : "–";
+      $("fit").textContent  = ok ? r.r2.toFixed(2) : "–";
+      $("mlpp").textContent = r.mlpp.toFixed(2) + (r.mln ? "  ("+r.mln+"×)" : "  (default)");
+      $("ks").textContent = "×"+r.ga.toFixed(2)+" / "+(r.gb>=0?"+":"−")+Math.abs(r.gb).toFixed(0)+" s";
+      $("kn").textContent = r.gn+" / "+r.mln;
+    }
+    drawMoisture($("cm"), z); drawAdc($("ca"), z);
+  }
+  // tank
+  const f=document.getElementById("tfill"), t=document.getElementById("ttxt");
+  if (tank.pct>=0){ f.style.width=tank.pct+"%"; f.style.background = tank.pct<10?css("--red"):tank.pct<25?css("--orange"):css("--accent");
+    t.textContent = tank.pct<10 ? `EMPTY · ${tank.pct}%` : `${tank.pct}% · ${tank.ml} mL`; }
+  else { f.style.width="0"; t.textContent="no reading"; }
+  // accuracy table
+  const tb=document.querySelector("#acc tbody"); tb.innerHTML="";
+  for (let z=0; z<NZ; z++) for (const [i,a] of acc[z].entries()){
+    const lp = learn[z][i] ? learn[z][i].loss : NaN;      // RMS error of ALL predictions made in that period
+    const tr=document.createElement("tr");
+    const diff=a.pred-a.actual, col=Math.abs(a.err)<15?css("--green"):Math.abs(a.err)<35?css("--yellow"):css("--red");
+    tr.innerHTML=`<td>Zone ${z+1} · #${a.n}</td><td>×${a.ga.toFixed(2)} / ${a.gb>=0?"+":"−"}${Math.abs(a.gb).toFixed(0)} s</td><td>${fmtDur(a.pred)}</td><td>${fmtDur(a.actual)}</td><td style="color:${col}">${diff<0?"−":"+"}${fmtDur(Math.abs(diff))} ${Math.abs(diff)*60<2?"(on target)":diff<0?"(too short)":"(too long)"}</td><td style="color:${Math.abs(a.err)<15?css("--green"):Math.abs(a.err)<35?css("--yellow"):css("--red")}">${a.err>0?"+":""}${a.err.toFixed(0)}%</td><td style="color:${isFinite(lp)?(lp<10?css("--green"):lp<20?css("--yellow"):css("--red")):css("--muted")}">${isFinite(lp)?lp.toFixed(0)+"%":"–"}</td>`;
+    tb.appendChild(tr);
+  }
+  { // average error, first cycles against the latest ones (all zones together, by cycle number)
+    const all=[]; acc.forEach(a=>a.forEach(r=>all.push(r))); all.sort((x,y)=>x.n-y.n);
+    const m=a=>a.reduce((s,r)=>s+Math.abs(r.err),0)/a.length;
+    let el=document.getElementById("accsum");
+    if (!el){ el=document.createElement("p"); el.id="accsum"; el.className="cap"; document.getElementById("acc").after(el); }
+    const lp3=learn.flatMap(a=>a.slice(-3)).map(p=>p.loss), lpm=lp3.length?lp3.reduce((x,y)=>x+y,0)/lp3.length:NaN;
+    el.textContent = all.length>=6 ? `First-prediction error (the single earliest, noisiest prediction): first 3 cycles of each zone ${m(all.filter(r=>r.n<=3)).toFixed(1)}%  ->  latest 3 cycles ${m(acc.flatMap(a=>a.slice(-3))).toFixed(1)}%.`
+      + (isFinite(lpm)?`  Whole-period error (every prediction of the period, what the controller learns from): latest 3 cycles ${lpm.toFixed(1)}%.`:"") : "";
+  }
+  if (!tb.children.length) tb.innerHTML=`<tr><td colspan="7" style="color:var(--muted);text-align:left">fills in after a zone has been predicted and then watered</td></tr>`;
+  // events
+  const ev=document.getElementById("events");
+  if (ev.dataset.n != events.length){
+    ev.dataset.n=events.length;
+    ev.innerHTML = events.slice().reverse().map(e=>{
+      const m=e.text.match(/^Z(\d)/); const cls = m? "z"+m[1]:"";
+      return `<div class="${cls}">${e.when.toLocaleTimeString()}  ${e.text.replace(/</g,"&lt;")}</div>`; }).join("");
+  }
+  // live indicator
+  if (lastRx && Date.now()-lastRx < 4000 && port) setStatus(true,"receiving data");
+}
+setInterval(()=>{ refresh(); drawExplain(); drawAccChart(); drawKChart(); drawMlChart(); drawCountdown('cd0',0); drawCountdown('cd1',1); }, 500);
+window.addEventListener("resize", ()=>{ refresh(); drawExplain(); drawAccChart(); drawKChart(); drawMlChart(); drawCountdown("cd0",0); drawCountdown("cd1",1); });
+document.getElementById("win").addEventListener("change", refresh);
+
+</script>
+</body>
+</html>

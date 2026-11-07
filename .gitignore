@@ -1,0 +1,29 @@
+# Build output
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+Debug/
+Release/
+build/
+
+# IDE
+.vscode/
+.settings/
+.metadata/
+*.launch
+.cproject
+.project
+.idea/
+
+# Logs and exports
+*.log
+irrigation_dashboard_export.csv
+
+# OS
+.DS_Store
+Thumbs.db
+~$*.docx
