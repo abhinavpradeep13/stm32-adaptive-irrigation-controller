@@ -94,13 +94,12 @@ On power-up the firmware runs a 3-second pump test and a 3-touch screen calibrat
 ## Dashboard
 
 1. Flash the firmware and keep the board connected by USB.
-2. Open `dashboard/index.html` in **Chrome or Edge**. Web Serial is not available in Firefox or Safari.
+2. Download `dashboard/index.html` and open it in **Chrome or Edge**. Web Serial is not available in Firefox or Safari.
 3. Click **Connect board** and pick the ST-Link COM port. Close any other serial terminal first.
 4. Optionally use **Rain Z1 / Rain Z2** to send a simulated rain event (demo firmware only), **Save CSV** to export, and **Load log file** to replay a saved log.
 
 The dashboard parses the `CSV,...`, `SAMP,...` and event lines that the firmware prints, so it works with either firmware file.
 
-**Live version:** once GitHub Pages is enabled (Settings → Pages → `main` branch, `/dashboard` folder), it is served over HTTPS at `https://<your-username>.github.io/<repo-name>/`. Web Serial works there. You still need the board plugged in.
 
 ## How the prediction works
 
