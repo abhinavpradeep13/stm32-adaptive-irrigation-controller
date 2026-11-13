@@ -6,8 +6,6 @@ Course project for **23ELC302, Embedded Systems Design using ARM**, B.Tech. Elec
 
 <p align="center">
   <img src="docs/images/prototype.jpg" alt="Assembled prototype" height="280">
-</p>
-<p align="center">
   <img src="docs/images/tft-home.jpg" alt="TFT home screen" height="280">
 </p>
 
